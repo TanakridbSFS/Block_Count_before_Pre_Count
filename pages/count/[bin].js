@@ -80,7 +80,7 @@ export default function CountBinPage() {
     try {
       const res = await fetch(`/api/bin/${encodeURIComponent(bin)}`);
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "โหลดข้อมูลไม่สำเร็จ");
+      if (!res.ok) throw new Error(json.error || "Failed to load data");
       setBaselineSnapshot(json.snapshot);
       setHadExisting(json.records.length > 0);
       setLines(recordsToDraftLines(json.records));
@@ -231,7 +231,7 @@ export default function CountBinPage() {
 
   async function handleConfirmSave() {
     if (lines.length === 0) {
-      setSaveError("ยังไม่มีรายการนับให้บันทึก");
+      setSaveError("No lines to save yet");
       return;
     }
     setSaving(true);
@@ -260,7 +260,7 @@ export default function CountBinPage() {
         setConflict(json);
         return;
       }
-      if (!res.ok) throw new Error(json.error || "บันทึกไม่สำเร็จ");
+      if (!res.ok) throw new Error(json.error || "Save failed");
       setSavedBanner(true);
       setTimeout(() => router.push("/"), 900);
     } catch (e) {
@@ -281,43 +281,63 @@ export default function CountBinPage() {
 
   return (
     <div className="page">
-      <div className="title">Bin: {bin}</div>
-      <div className="banner banner-info">
-        <Link href="/">← Scan อีกครั้ง / เปลี่ยน Bin</Link>
-      </div>
+      <Link href="/" className="back-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+        Back to Scan
+      </Link>
 
-      {loading && <div className="card">กำลังโหลดข้อมูล…</div>}
+      <div className="title">Bin: {bin}</div>
+
+      {loading && <div className="card">Loading…</div>}
       {loadError && <div className="banner banner-error">{loadError}</div>}
 
       {!loading && !loadError && (
         <>
           {hadExisting && (
             <div className="banner banner-warn">
-              Bin นี้มีการนับไว้ก่อนแล้ว — แก้ไข/ลบ/เพิ่มรายการได้ตามต้องการ แล้วกด &quot;Confirm &amp; Save&quot;
-              การนับเดิมของ Bin นี้ทั้งหมดจะถูกเขียนทับด้วยรายการด้านล่าง
+              <IconInfo />
+              <div className="banner-content">
+                This Bin already has a saved count — edit, remove, or add lines as needed. <b>Confirm &amp; Save</b>{" "}
+                will overwrite the entire previous count for this Bin with what&apos;s below.
+              </div>
             </div>
           )}
 
           {remoteUpdateBanner && (
             <div className="banner banner-warn">
-              มีการบันทึก Bin นี้จากอีกเครื่องเข้ามาใหม่ ข้อมูลที่เห็นอยู่อาจไม่ใช่ล่าสุด{" "}
-              <button className="btn btn-secondary btn-sm" onClick={reloadAfterConflict} style={{ marginTop: 6 }}>
-                โหลดข้อมูลล่าสุด
-              </button>
+              <IconInfo />
+              <div className="banner-content">
+                Another device just saved this Bin. What you&apos;re seeing may be out of date.
+                <div>
+                  <button className="btn btn-secondary btn-sm" onClick={reloadAfterConflict} style={{ marginTop: 8 }}>
+                    Reload Latest
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
           {conflict && (
             <div className="banner banner-error">
-              <div style={{ marginBottom: 8 }}>{conflict.message}</div>
-              <div style={{ marginBottom: 8 }}>ยังไม่ได้บันทึกอะไรทับ — กดโหลดข้อมูลล่าสุดแล้วนับ/แก้ไขใหม่อีกครั้ง</div>
-              <button className="btn btn-primary btn-sm" onClick={reloadAfterConflict}>
-                โหลดข้อมูลล่าสุด
-              </button>
+              <IconWarn />
+              <div className="banner-content">
+                <div style={{ marginBottom: 6 }}>{conflict.message}</div>
+                <div style={{ marginBottom: 8 }}>Nothing was overwritten — reload the latest data, then count or edit again.</div>
+                <button className="btn btn-primary btn-sm" onClick={reloadAfterConflict}>
+                  Reload Latest
+                </button>
+              </div>
             </div>
           )}
 
-          {savedBanner && <div className="banner banner-info">บันทึกสำเร็จ — กำลังกลับไปหน้า Scan…</div>}
+          {savedBanner && (
+            <div className="banner banner-info">
+              <IconCheck />
+              <div className="banner-content">Saved — returning to Scan…</div>
+            </div>
+          )}
 
           {lines.map((line) => (
             <div className="line-row" key={line.id}>
@@ -327,10 +347,10 @@ export default function CountBinPage() {
                   {line.batch ? ` / Batch ${line.batch}` : ""}
                 </span>
                 <button className="btn btn-danger btn-sm" onClick={() => removeLine(line.id)}>
-                  ลบ
+                  Remove
                 </button>
               </div>
-              <div className="line-name">{line.materialName || "(ไม่พบชื่อ Material)"}</div>
+              <div className="line-name">{line.materialName || "(Material name not found)"}</div>
               <div className="card-row">
                 <span>Category</span>
                 <b>
@@ -349,7 +369,7 @@ export default function CountBinPage() {
           ))}
 
           <div className="card">
-            <div style={{ fontWeight: 700, marginBottom: 10 }}>+ New Line</div>
+            <div className="card-heading">+ New Line</div>
 
             <div className="field">
               <label>Material Code</label>
@@ -363,18 +383,16 @@ export default function CountBinPage() {
                   if (raw && !handleDelimitedScan(raw)) applyMatLookup(raw);
                 }}
                 inputMode="numeric"
-                placeholder="สแกน หรือคีย์ Material Code"
+                placeholder="Scan or key in Material Code"
               />
               {matKnown === false && matInput.trim() && (
-                <div style={{ fontSize: 12, color: "#8a5300", marginTop: 4 }}>
-                  ไม่พบ Material นี้ใน Master — กรอกชื่อ/UOM เองได้
-                </div>
+                <div className="hint">Material not found in Master — you can enter name/UOM manually</div>
               )}
             </div>
 
             {matKnown === false && (
               <div className="field">
-                <label>Material Name (ไม่พบใน Master — กรอกเอง)</label>
+                <label>Material Name (not in Master — enter manually)</label>
                 <input value={materialNameInput} onChange={(e) => setMaterialNameInput(e.target.value)} />
               </div>
             )}
@@ -387,7 +405,7 @@ export default function CountBinPage() {
                 onChange={(e) => setBatchInput(e.target.value)}
                 onKeyDown={handleBatchKeyDown}
                 inputMode="numeric"
-                placeholder="สแกน หรือคีย์ Batch (ถ้ามี)"
+                placeholder="Scan or key in Batch (if any)"
               />
             </div>
 
@@ -402,7 +420,7 @@ export default function CountBinPage() {
               </label>
               {uomOverride || matKnown === false ? (
                 <select value={uomInput} onChange={(e) => setUomInput(e.target.value)}>
-                  <option value="">— เลือก UOM —</option>
+                  <option value="">— Select UOM —</option>
                   {UOM_OPTIONS.map((u) => (
                     <option key={u} value={u}>
                       {u}
@@ -410,7 +428,7 @@ export default function CountBinPage() {
                   ))}
                 </select>
               ) : (
-                <input className={uomInput === "KG" ? "uom-kg" : ""} value={uomInput} readOnly placeholder="จะเติมอัตโนมัติจาก Material Code" />
+                <input className={uomInput === "KG" ? "uom-kg" : ""} value={uomInput} readOnly placeholder="Auto-filled from Material Code" />
               )}
             </div>
 
@@ -422,7 +440,7 @@ export default function CountBinPage() {
                 onChange={(e) => setQtyInput(e.target.value)}
                 onKeyDown={handleQtyKeyDown}
                 inputMode="numeric"
-                placeholder="พิมพ์จำนวนที่นับได้ แล้ว Enter"
+                placeholder="Type counted quantity, then Enter"
               />
             </div>
 
@@ -437,12 +455,44 @@ export default function CountBinPage() {
           </div>
 
           {saveError && <div className="banner banner-error">{saveError}</div>}
-
-          <button className="btn btn-primary" disabled={saving || !!conflict} onClick={handleConfirmSave}>
-            {saving ? "กำลังบันทึก…" : "Confirm & Save"}
-          </button>
         </>
       )}
+
+      {!loading && !loadError && (
+        <div className="action-bar">
+          <div className="action-bar-inner">
+            <button className="btn btn-primary" disabled={saving || !!conflict} onClick={handleConfirmSave}>
+              {saving ? "Saving…" : "Confirm & Save"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function IconInfo() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8h.01M11 12h1v5h1" />
+    </svg>
+  );
+}
+
+function IconWarn() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 9v4m0 4h.01M10.3 3.9 2.5 18a1 1 0 0 0 .9 1.5h17.2a1 1 0 0 0 .9-1.5L13.7 3.9a1 1 0 0 0-1.7 0Z" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="m8 12.5 2.5 2.5L16 9.5" />
+    </svg>
   );
 }

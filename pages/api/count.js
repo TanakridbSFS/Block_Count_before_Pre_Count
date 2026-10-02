@@ -50,7 +50,7 @@ export default async function handler(req, res) {
     if (result.conflict) {
       return res.status(409).json({
         conflict: true,
-        message: "Bin นี้ถูกบันทึกจากเครื่องอื่นไปแล้วหลังจากที่คุณเปิดดูครั้งล่าสุด",
+        message: "This Bin was already saved by another device after you last opened it.",
         currentRecords: result.currentRecords,
       });
     }
