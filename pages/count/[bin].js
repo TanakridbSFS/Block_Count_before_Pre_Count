@@ -229,6 +229,33 @@ export default function CountBinPage() {
     markDirty();
   }
 
+  // Pulls a saved line back out of the list and into the New Line form so
+  // it can be changed, then re-added — editing is just "take it out, let
+  // the normal add-a-line flow put it back in."
+  function startEditLine(line) {
+    const resolved = resolveMaterial(line.mat);
+    setMatInput(line.mat);
+    setBatchInput(line.batch || "");
+    setQtyInput(String(line.qty ?? ""));
+    setMaterialNameInput(line.materialName || "");
+    setCategoryCodeInput(line.categoryCode || "");
+    setCategoryNameInput(line.categoryName || "");
+    setUomInput(line.uom || "");
+    if (resolved.matKnown) {
+      setMatKnown(true);
+      // If the saved UOM doesn't match what the master would auto-fill,
+      // it must have been manually overridden before — keep it editable
+      // as an override rather than silently snapping back to the master.
+      setUomOverride(line.uom !== resolved.uom);
+    } else {
+      setMatKnown(false);
+      setUomOverride(true);
+    }
+    setLines((prev) => prev.filter((l) => l.id !== line.id));
+    markDirty();
+    matRef.current?.focus();
+  }
+
   async function handleConfirmSave() {
     if (lines.length === 0) {
       setSaveError("No lines to save yet");
@@ -346,9 +373,14 @@ export default function CountBinPage() {
                   {line.mat}
                   {line.batch ? ` / Batch ${line.batch}` : ""}
                 </span>
-                <button className="btn btn-danger btn-sm" onClick={() => removeLine(line.id)}>
-                  Remove
-                </button>
+                <span style={{ display: "flex", gap: 6 }}>
+                  <button className="btn btn-secondary btn-sm" onClick={() => startEditLine(line)}>
+                    Edit
+                  </button>
+                  <button className="btn btn-danger btn-sm" onClick={() => removeLine(line.id)}>
+                    Remove
+                  </button>
+                </span>
               </div>
               <div className="line-name">{line.materialName || "(Material name not found)"}</div>
               <div className="card-row">
